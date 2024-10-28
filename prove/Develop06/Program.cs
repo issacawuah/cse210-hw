@@ -1,267 +1,102 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 
-namespace EternalQuest
+// Base class
+public abstract class Activity
 {
-    // Base Class
-    public abstract class Goal
+    private DateTime _date;
+    private int _minutes;
+
+    protected Activity(DateTime date, int minutes)
     {
-        protected string _name;
-        protected int _points;
-        protected bool _isCompleted;
-
-        public Goal(string name, int points)
-        {
-            _name = name;
-            _points = points;
-            _isCompleted = false;
-        }
-
-        public abstract void RecordProgress();
-        public virtual string DisplayGoal()
-        {
-            return $"{(_isCompleted ? "[X]" : "[ ]")} {_name} - {_points} points";
-        }
-
-        public int Points => _points;
-        public bool IsCompleted => _isCompleted;
+        _date = date;
+        _minutes = minutes;
     }
 
-    // Simple Goal Class
-    public class SimpleGoal : Goal
-    {
-        public SimpleGoal(string name, int points) : base(name, points) { }
+    protected int GetMinutes() => _minutes;
 
-        public override void RecordProgress()
-        {
-            _isCompleted = true; // Mark as completed
-        }
+    public abstract double GetDistance();
+    public abstract double GetSpeed();
+    public abstract double GetPace();
+
+    public string GetSummary()
+    {
+        return $"{_date:dd MMM yyyy} {this.GetType().Name} ({_minutes} min) - " +
+               $"Distance: {GetDistance()} {GetDistanceUnit()}, " +
+               $"Speed: {GetSpeed()} {GetSpeedUnit()}, " +
+               $"Pace: {GetPace()} min per {GetDistanceUnit().ToLower()}";
     }
 
-    // Eternal Goal Class
-    public class EternalGoal : Goal
-    {
-        public EternalGoal(string name, int points) : base(name, points) { }
+    protected virtual string GetDistanceUnit() => "miles";
+    protected virtual string GetSpeedUnit() => "mph";
+}
 
-        public override void RecordProgress()
-        {
-            // Points are awarded but the goal remains uncompleted
-        }
+// Derived class for Running
+public class Running : Activity
+{
+    private double _distance; // in miles
+
+    public Running(DateTime date, int minutes, double distance) : base(date, minutes)
+    {
+        _distance = distance;
     }
 
-    // Checklist Goal Class
-    public class ChecklistGoal : Goal
+    public override double GetDistance() => _distance;
+
+    public override double GetSpeed() => (GetDistance() / GetMinutes()) * 60;
+
+    public override double GetPace() => GetDistance() > 0 ? GetMinutes() / GetDistance() : 0;
+}
+
+// Derived class for Cycling
+public class Cycling : Activity
+{
+    private double _speed; // in mph
+
+    public Cycling(DateTime date, int minutes, double speed) : base(date, minutes)
     {
-        private int _timesCompleted;
-        private int _totalRequired;
-        private const int BonusPoints = 500;
-
-        public ChecklistGoal(string name, int points, int totalRequired) : base(name, points)
-        {
-            _totalRequired = totalRequired;
-            _timesCompleted = 0;
-        }
-
-        public override void RecordProgress()
-        {
-            if (_timesCompleted < _totalRequired)
-            {
-                _timesCompleted++;
-                if (_timesCompleted == _totalRequired)
-                {
-                    _isCompleted = true; 
-                    // Mark as completed
-                    _points += BonusPoints; 
-                    // Add bonus points
-                }
-            }
-        }
-
-        public override string DisplayGoal()
-        {
-            return $"{base.DisplayGoal()} - Completed {_timesCompleted}/{_totalRequired} times";
-        }
+        _speed = speed;
     }
 
-    // Main Program Class
-    public class EternalQuest
+    public override double GetDistance() => (_speed * GetMinutes()) / 60;
+
+    public override double GetSpeed() => _speed;
+
+    public override double GetPace() => _speed > 0 ? 60 / _speed : 0;
+}
+
+// Derived class for Swimming
+public class Swimming : Activity
+{
+    private int _laps; // in laps
+
+    public Swimming(DateTime date, int minutes, int laps) : base(date, minutes)
     {
-        private List<Goal> _goals;
-        private int _totalPoints;
+        _laps = laps;
+    }
 
-        public EternalQuest()
+    public override double GetDistance() => _laps * 50 / 1000.0 * 0.62; // Convert to miles
+
+    public override double GetSpeed() => GetDistance() > 0 ? (GetDistance() / GetMinutes()) * 60 : 0;
+
+    public override double GetPace() => GetDistance() > 0 ? GetMinutes() / GetDistance() : 0;
+}
+
+// Main program
+class Program
+{
+    static void Main()
+    {
+        List<Activity> activities = new List<Activity>
         {
-            _goals = new List<Goal>();
-            _totalPoints = 0;
-        }
+            new Running(new DateTime(2022, 11, 3), 30, 3.0),
+            new Cycling(new DateTime(2022, 11, 4), 45, 12.0),
+            new Swimming(new DateTime(2022, 11, 5), 30, 20)
+        };
 
-        public void AddGoal(Goal goal)
+        foreach (var activity in activities)
         {
-            _goals.Add(goal);
-        }
-
-        public void DisplayGoals()
-        {
-            foreach (var goal in _goals)
-            {
-                Console.WriteLine(goal.DisplayGoal());
-            }
-        }
-
-        public void RecordGoalProgress(string goalName)
-        {
-            foreach (var goal in _goals)
-            {
-                if (goal.GetType().Name == goalName)
-                {
-                    goal.RecordProgress();
-                    _totalPoints += goal.Points;
-                    Console.WriteLine($"Progress recorded for: {goal.DisplayGoal()}");
-                    return;
-                }
-            }
-            Console.WriteLine("Goal not found.");
-        }
-
-        public void SaveProgress(string filename)
-        {
-            using (StreamWriter outputFile = new StreamWriter(filename))
-            {
-                foreach (var goal in _goals)
-                {
-                    outputFile.WriteLine($"{goal.GetType().Name},{goal.DisplayGoal()}");
-                }
-                outputFile.WriteLine($"TotalPoints,{_totalPoints}");
-            }
-        }
-
-        public void LoadProgress(string filename)
-        {
-            if (File.Exists(filename))
-            {
-                string[] lines = File.ReadAllLines(filename);
-                _goals.Clear();
-
-                foreach (var line in lines)
-                {
-                    var parts = line.Split(',');
-                    if (parts[0] == "TotalPoints")
-                    {
-                        _totalPoints = int.Parse(parts[1]);
-                    }
-                    else
-                    {
-                        // Here we need to reconstruct the goal based on its type
-                        string goalType = parts[0];
-                        string goalInfo = parts[1];
-                        string[] goalDetails = goalInfo.Split('-');
-                        string name = goalDetails[0].Trim();
-                        int points = int.Parse(goalDetails[1].Split(' ')[0].Trim());
-
-                        if (goalType == nameof(SimpleGoal))
-                        {
-                            AddGoal(new SimpleGoal(name, points));
-                        }
-                        else if (goalType == nameof(EternalGoal))
-                        {
-                            AddGoal(new EternalGoal(name, points));
-                        }
-                        else if (goalType == nameof(ChecklistGoal))
-                        {
-                            int completed = int.Parse(goalDetails[2].Split('/')[0].Trim());
-                            int required = int.Parse(goalDetails[2].Split('/')[1].Trim());
-                            var checklistGoal = new ChecklistGoal(name, points, required);
-                            for (int i = 0; i < completed; i++)
-                            {
-                                checklistGoal.RecordProgress();
-                            }
-                            AddGoal(checklistGoal);
-                        }
-                    }
-                }
-            }
-        }
-
-        public void DisplayScore()
-        {
-            Console.WriteLine($"Total Points: {_totalPoints}");
-        }
-
-        public static void Main(string[] args)
-        {
-            EternalQuest quest = new EternalQuest();
-            bool running = true;
-
-            while (running)
-            {
-                Console.WriteLine("Eternal Quest Menu:");
-                Console.WriteLine("1. Add Simple Goal");
-                Console.WriteLine("2. Add Eternal Goal");
-                Console.WriteLine("3. Add Checklist Goal");
-                Console.WriteLine("4. Display Goals");
-                Console.WriteLine("5. Record Goal Progress");
-                Console.WriteLine("6. Save Progress");
-                Console.WriteLine("7. Load Progress");
-                Console.WriteLine("8. Display Total Points");
-                Console.WriteLine("9. Exit");
-                Console.Write("Choose an option: ");
-
-                string choice = Console.ReadLine();
-                switch (choice)
-                {
-                    case "1":
-                        Console.Write("Enter goal name: ");
-                        string simpleGoalName = Console.ReadLine();
-                        Console.Write("Enter points: ");
-                        int simplePoints = int.Parse(Console.ReadLine());
-                        quest.AddGoal(new SimpleGoal(simpleGoalName, simplePoints));
-                        break;
-                    case "2":
-                        Console.Write("Enter goal name: ");
-                        string eternalGoalName = Console.ReadLine();
-                        Console.Write("Enter points: ");
-                        int eternalPoints = int.Parse(Console.ReadLine());
-                        quest.AddGoal(new EternalGoal(eternalGoalName, eternalPoints));
-                        break;
-                    case "3":
-                        Console.Write("Enter goal name: ");
-                        string checklistGoalName = Console.ReadLine();
-                        Console.Write("Enter points: ");
-                        int checklistPoints = int.Parse(Console.ReadLine());
-                        Console.Write("Enter number of times to complete: ");
-                        int totalRequired = int.Parse(Console.ReadLine());
-                        quest.AddGoal(new ChecklistGoal(checklistGoalName, checklistPoints, totalRequired));
-                        break;
-                    case "4":
-                        quest.DisplayGoals();
-                        break;
-                    case "5":
-                        Console.Write("Enter goal type (SimpleGoal/EternalGoal/ChecklistGoal): ");
-                        string goalType = Console.ReadLine();
-                        quest.RecordGoalProgress(goalType);
-                        break;
-                    case "6":
-                        Console.Write("Enter filename to save progress: ");
-                        string saveFile = Console.ReadLine();
-                        quest.SaveProgress(saveFile);
-                        break;
-                    case "7":
-                        Console.Write("Enter filename to load progress: ");
-                        string loadFile = Console.ReadLine();
-                        quest.LoadProgress(loadFile);
-                        break;
-                    case "8":
-                        quest.DisplayScore();
-                        break;
-                    case "9":
-                        running = false;
-                        break;
-                    default:
-                        Console.WriteLine("Invalid option. Try again.");
-                        break;
-                }
-            }
+            Console.WriteLine(activity.GetSummary());
         }
     }
 }
